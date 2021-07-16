@@ -7,12 +7,41 @@
   <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.css" />
   <script src="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>"
   <style>
     .my-popup {
       max-height: 400px;
       overflow-y: auto;
     }
   </style>
+  <script>
+    function ExportControl() {}
+    ExportControl.prototype = {
+      onAdd: function(map) {
+        this._map = map;
+        this._container = document.createElement('div');
+        this._container.className = 'mapboxgl-ctrl';
+        const button = document.createElement('button');
+        button.textContent = "Get GeoJSON";
+        this._container.appendChild(button);
+        button.addEventListener("click", function() {
+          const json = {
+            "type": "FeatureCollection",
+            "features": map.queryRenderedFeatures()
+          };
+          const blob = new Blob([JSON.stringify(json, null, 2)], {
+            type: "application/json;charset=utf-8"
+          });
+          saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
+        });
+        return this._container;
+      },
+      onRemove: function() {
+        this._container.parentNode.removeChild(this._container);
+        this._map = undefined;
+      }
+    };
+  </script>
 </head>
 
 <body>
@@ -112,7 +141,6 @@
           "maxzoom": 24,
           "filter": ["!", ["has", "point_count"]],
           "paint": {
-            "circle-color": "#ffff00",
             "circle-radius": 8,
             "circle-stroke-width": 1,
             "circle-stroke-color": "#808080"
@@ -254,6 +282,8 @@
         "hash": true,
         "style": style
       });
+
+      map.addControl(new ExportControl());
 
       map.on("load", function() {
 
