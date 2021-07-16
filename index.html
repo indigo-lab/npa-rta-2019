@@ -49,6 +49,21 @@
           "source": "pale",
           "minzoom": 5,
           "maxzoom": 24
+        }, {
+          "id": "heatmap",
+          "type": "heatmap",
+          "source": "npa-rta-2019",
+          "source-layer": "npa-rta-2019",
+          "minzoom": 0,
+          "maxzoom": 24,
+          "paint": {
+            "heatmap-weight": ["case", ["has", "point_count"],
+              ["get", "point_count"], 1
+            ]
+          },
+          "layout": {
+            "visibility": "none"
+          }
         },
         {
           "id": "npa-rta-2019-cluster",
