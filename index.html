@@ -14,34 +14,6 @@
       overflow-y: auto;
     }
   </style>
-  <script>
-    function ExportControl() {}
-    ExportControl.prototype = {
-      onAdd: function(map) {
-        this._map = map;
-        this._container = document.createElement('div');
-        this._container.className = 'mapboxgl-ctrl';
-        const button = document.createElement('button');
-        button.textContent = "Get GeoJSON";
-        this._container.appendChild(button);
-        button.addEventListener("click", function() {
-          const json = {
-            "type": "FeatureCollection",
-            "features": map.queryRenderedFeatures()
-          };
-          const blob = new Blob([JSON.stringify(json, null, 2)], {
-            type: "application/json;charset=utf-8"
-          });
-          saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
-        });
-        return this._container;
-      },
-      onRemove: function() {
-        this._container.parentNode.removeChild(this._container);
-        this._map = undefined;
-      }
-    };
-  </script>
 </head>
 
 <body>
@@ -153,121 +125,100 @@
     (async function() {
 
       const codebook = await (await fetch("codebook_2019.json")).json();
-      const toHTML = function(properties) {
+      codebook["@graph"].sort((a, b) => b["rdfs:label"].length - a["rdfs:label"].length);
+
+      function rosenLabel(rosen) {
+        const no = parseInt(rosen.substring(0, 4));
+        if (no < 1000) return `一般国道（国道番号:${no}）`;
+        if (no < 1500) return `主要地方道－都道府県道(${no})`;
+        if (no < 2000) return `主要地方道－市道(${no})`;
+        if (no < 3000) return `一般都道府県道(${no})`;
+        if (no < 4000) return `一般市町村道(${no})`;
+        if (no < 5000) return `高速自動車国道(${no})`;
+        if (no < 5500) return `自動車専用道－指定(${no})`;
+        if (no < 6000) return `自動車専用道－その他(${no})`;
+        if (no < 7000) return `道路運送法上の道路(${no})`;
+        if (no < 8000) return `農（免）道(${no})`;
+        if (no < 8500) return `林道(${no})`;
+        if (no < 9000) return `港湾道(${no})`;
+        if (no < 9500) return `私道(${no})`;
+        if (no === 9500) return `その他(${no})`;
+        if (no === 9900) return `一般の交通の用に供するその他の道路(${no})`;
+        return null;
+      }
+
+      function enrichment(feature) {
+
+        Object.keys(feature.properties).forEach(k => {
+          if (k === "死者数" || k === "負傷者数") {
+            feature.properties[k] = parseInt(feature.properties[k]);
+            return;
+          }
+
+          let v = feature.properties[k];
+          if (k === "警察署等コード") v = feature.properties["都道府県コード"] + ">" + v;
+          if (k === "トンネル番号")
+            v = feature.properties["都道府県コード"] + ">" +
+            feature.properties["路線コード"].substring(0, 4) + ">" + v;
+          if (k === "路線コード")
+            v = feature.properties["都道府県コード"] + ">" +
+            feature.properties["路線コード"].substring(0, 4);
+
+          const cs = codebook["@graph"].find(a => k.indexOf(a["rdfs:label"]) === 0);
+          if (cs && cs["skos:hasTopConcept"].length > 0) {
+            const c = cs["skos:hasTopConcept"].find(a => a["skos:notation"] === v);
+            if (c) feature.properties[k + "@"] = c["skos:prefLabel"];
+          }
+
+          if (k === "路線コード") {
+            if (feature.properties["路線コード@"] === undefined) {
+              const label = rosenLabel(feature.properties["路線コード"]);
+              if (label) feature.properties[k + "@"] = label;
+            }
+          }
+        });
+        return feature;
+      }
+
+      function ExportControl() {}
+      ExportControl.prototype = {
+        onAdd: function(map) {
+          this._map = map;
+          this._container = document.createElement('div');
+          this._container.className = 'mapboxgl-ctrl';
+          const button = document.createElement('button');
+          button.textContent = "Get GeoJSON";
+          this._container.appendChild(button);
+          button.addEventListener("click", function() {
+            const json = {
+              "type": "FeatureCollection",
+              "features": map.queryRenderedFeatures().map(enrichment)
+            };
+            const blob = new Blob([JSON.stringify(json, null, 2)], {
+              type: "application/json;charset=utf-8"
+            });
+            saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
+          });
+          return this._container;
+        },
+        onRemove: function() {
+          this._container.parentNode.removeChild(this._container);
+          this._map = undefined;
+        }
+      };
+
+
+      const toHTML = function(feature) {
+        const properties = feature.properties;
         const html = ["<div class='my-popup'>"];
         Object.keys(properties).forEach(k => {
-          let v = properties[k];
-
-          let normalizedKey = k;
-          if (normalizedKey.match(/^(.+)#[0-9]+$/)) {
-            normalizedKey = RegExp.$1;
-          }
-          if (normalizedKey === "警察署等コード") {
-            v = properties["都道府県コード"] + ">" + properties[k];
-          }
-
-          if (normalizedKey === "祝日(発生年月日)") {
-            normalizedKey = "祝日";
-          }
-          if (normalizedKey === "曜日(発生年月日)") {
-            normalizedKey = "曜日";
-          }
-          if (normalizedKey.startsWith("発生日時")) {
-            normalizedKey = "発生日時";
-          }
-          if (normalizedKey.match(/^(.+)\(当事者[AB]\)$/)) {
-            normalizedKey = RegExp.$1;
-          }
-
-          const rosen = codebook["@graph"].find(a => a["rdfs:label"] === "路線(高速自動車国道,自動車専用道(指定))コード")["skos:hasTopConcept"];
-
-          const cs = codebook["@graph"].find(a => a["rdfs:label"] === normalizedKey);
-          if (cs && normalizedKey === "路線コード") {
-            html.push(`<b title="${cs['rdfs:comment']}">${k}</b> `);
-
-            const head = v.substring(0, 4);
-            const tail = v.substring(4);
-            const no = parseInt(head);
-            if (no < 1000) {
-              v = `一般国道（国道番号:${no}）`;
-            } else if (no < 1500) {
-              v = `主要地方道－都道府県道(${no})`;
-            } else if (no < 2000) {
-              v = `主要地方道－市道(${no})`;
-            } else if (no < 3000) {
-              v = `一般都道府県道(${no})`;
-            } else if (no < 4000) {
-              v = `一般市町村道(${no})`;
-            } else if (no < 5000) {
-              v = `高速自動車国道(${no})`;
-              const z = rosen.find(x => x["skos:notation"] === properties["都道府県コード"] + ">" + head);
-              if (z) v += z["skos:prefLabel"];
-            } else if (no < 5500) {
-              v = `自動車専用道－指定(${no})`;
-              const z = rosen.find(x => x["skos:notation"] === properties["都道府県コード"] + ">" + head);
-              if (z) v += z["skos:prefLabel"];
-            } else if (no < 6000) {
-              v = `自動車専用道－その他(${no})`;
-            } else if (no < 7000) {
-              v = `道路運送法上の道路(${no})`;
-            } else if (no < 8000) {
-              v = `農（免）道(${no})`;
-            } else if (no < 8500) {
-              v = `林道(${no})`;
-            } else if (no < 9000) {
-              v = `港湾道(${no})`;
-            } else if (no < 9500) {
-              v = `私道(${no})`;
-            } else if (no === 9500) {
-              v = `その他(${no})`;
-            } else if (no === 9900) {
-              v = `一般の交通の用に供するその他の道路(${no})`;
-            }
-            if (tail !== "0") v += `(バイパス区間:${tail})`;
-
-            html.push(`<code>${v}</code><br/>`);
-            /*
-                        項目名 路線コード
-            適用 本票
-            交通事故が発生した道路をいう。
-            コード（上４桁） 路線名 コード（下１桁） 区分
-            0001～0999 一般国道（国道番号） 0 現道区間又は包括路線
-            1000～1499  1～9 バイパス区間
-            1500～1999
-            2000～2999
-            3000～3999
-            4000～4999 高速自動車国道 *1
-            5000～5499  *1
-            5500～5999
-            6000～6999
-            7000～7999
-            8000～8499
-            8500～8999
-            9000～9499
-            9500
-            9900
-
-                        html.push(`<code>やるぜ${v}</code><br/>`);
-              */
-          } else if (cs && cs["skos:hasTopConcept"].length === 0) {
-            html.push(`<b title="${cs['rdfs:comment']}">${k}</b> `);
-            html.push(`<code>${v}</code><br/>`);
-          } else if (cs) {
-
-            html.push(`<b title="${cs['rdfs:comment']}">${k}</b> `);
-
-            const c = cs["skos:hasTopConcept"].find(a => a["skos:notation"] === v);
-            if (c) {
-              v = `${c["skos:prefLabel"]} (${v})`;
-              html.push(`<span>${v}</span><br/>`);
-            } else {
-              //              console.error("Concept not found : ", normalizedKey, v, cs);
-              html.push(`<span>${v}</span><br/>`);
-            }
-          } else {
-            //          console.error("ConceptScheme not found : ", normalizedKey);
+          if (k.match(/@$/)) return;
+          if (properties[k + "@"]) {
             html.push(`<b>${k}</b> `);
-            html.push(`<span>${v}</span><br/>`);
+            html.push(`<span>${properties[k+"@"]} (${properties[k]})</span><br/>`);
+          } else {
+            html.push(`<b>${k}</b> `);
+            html.push(`<span>${properties[k]}</span><br/>`);
           }
         });
         html.push("</div>");
@@ -297,12 +248,9 @@
               map.getCanvas().style.cursor = '';
               break;
             case "click":
-              const dl = document.createElement("dl");
-              const prop = e.features[0].properties;
-              const html = toHTML(e.features[0].properties);
               new maplibregl.Popup()
                 .setLngLat(e.lngLat)
-                .setHTML(html)
+                .setHTML(toHTML(enrichment(e.features[0])))
                 .addTo(map);
               break;
           }
