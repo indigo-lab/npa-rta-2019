@@ -5,11 +5,11 @@
 データの確認とクリッピングダウンロードを目的としたデモです。
 
 - 地図上のサークルをクリックすることで属性情報ががポップアップ表示されます
-- 画面右上の「GetGeoJSON」ボタンをクリックすることで現在見えている交通事故情報を GeoJSON FeatureCollection としてダウンロードできます
+- 画面右上の **【Get GeoJSON】** ボタンをクリックすることで現在見えている交通事故情報を GeoJSON FeatureCollection としてダウンロードできます
 
 <https://indigo-lab.github.io/npa-rta-2019/>
 
-[![npa-rta-2019](https://repository-images.githubusercontent.com/357730702/111d3b00-c2f0-11eb-9899-7658407cfcee)](https://indigo-lab.github.io/npa-rta-2019/)
+[![npa-rta-2019](https://repository-images.githubusercontent.com/386204191/ce32d9b8-6fda-4f1a-a14f-dc080123671e)](https://indigo-lab.github.io/npa-rta-2019/)
 
 # タイル仕様
 
@@ -294,7 +294,7 @@ GeoJSON properties のうち、コード表を参照することでコード値�
 以下のように `${もともとのプロパティ名}@` のように、末尾に @ を付与したプロパティに対して
 ラベル値が設定されます。
 
-```
+```properties.json
 {
   "都道府県コード": "30",
   "都道府県コード@": "東京"
@@ -304,11 +304,11 @@ GeoJSON properties のうち、コード表を参照することでコード値�
 ## コードリスト
 
 コードリストの原本は [コード表](https://www.npa.go.jp/publications/statistics/koutsuu/opendata/2019/opendata_2019.html) として PDF ファイルが提供されています。
-こちらを JSON-LD に加工したものを <codebook_2019.json> として収録しています。
+こちらを JSON-LD に加工したものを <./codebook_2019.json> として収録しています。
 
 ## 属性拡張のための JavaScript 関数
 
-デモページで使用している属性拡張のための JavaScript 関数を <enrichment.bundle.js> として収録しています。
+デモページで使用している属性拡張のための JavaScript 関数を <./enrichment.bundle.js> として収録しています。
 
 # 更新履歴
 
