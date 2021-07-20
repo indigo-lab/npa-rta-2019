@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.css" />
   <script src="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>"
+  <script src="enrichment.bundle.js"></script>"
   <style>
     .my-popup {
       max-height: 400px;
@@ -122,148 +123,89 @@
       ]
     };
 
-    (async function() {
 
-      const codebook = await (await fetch("codebook_2019.json")).json();
-      codebook["@graph"].sort((a, b) => b["rdfs:label"].length - a["rdfs:label"].length);
-
-      function rosenLabel(rosen) {
-        const no = parseInt(rosen.substring(0, 4));
-        if (no < 1000) return `一般国道（国道番号:${no}）`;
-        if (no < 1500) return `主要地方道－都道府県道(${no})`;
-        if (no < 2000) return `主要地方道－市道(${no})`;
-        if (no < 3000) return `一般都道府県道(${no})`;
-        if (no < 4000) return `一般市町村道(${no})`;
-        if (no < 5000) return `高速自動車国道(${no})`;
-        if (no < 5500) return `自動車専用道－指定(${no})`;
-        if (no < 6000) return `自動車専用道－その他(${no})`;
-        if (no < 7000) return `道路運送法上の道路(${no})`;
-        if (no < 8000) return `農（免）道(${no})`;
-        if (no < 8500) return `林道(${no})`;
-        if (no < 9000) return `港湾道(${no})`;
-        if (no < 9500) return `私道(${no})`;
-        if (no === 9500) return `その他(${no})`;
-        if (no === 9900) return `一般の交通の用に供するその他の道路(${no})`;
-        return null;
-      }
-
-      function enrichment(feature) {
-
-        Object.keys(feature.properties).forEach(k => {
-          if (k === "死者数" || k === "負傷者数") {
-            feature.properties[k] = parseInt(feature.properties[k]);
-            return;
-          }
-
-          let v = feature.properties[k];
-          if (k === "警察署等コード") v = feature.properties["都道府県コード"] + ">" + v;
-          if (k === "トンネル番号")
-            v = feature.properties["都道府県コード"] + ">" +
-            feature.properties["路線コード"].substring(0, 4) + ">" + v;
-          if (k === "路線コード")
-            v = feature.properties["都道府県コード"] + ">" +
-            feature.properties["路線コード"].substring(0, 4);
-
-          const cs = codebook["@graph"].find(a => k.indexOf(a["rdfs:label"]) === 0);
-          if (cs && cs["skos:hasTopConcept"].length > 0) {
-            const c = cs["skos:hasTopConcept"].find(a => a["skos:notation"] === v);
-            if (c) feature.properties[k + "@"] = c["skos:prefLabel"];
-          }
-
-          if (k === "路線コード") {
-            if (feature.properties["路線コード@"] === undefined) {
-              const label = rosenLabel(feature.properties["路線コード"]);
-              if (label) feature.properties[k + "@"] = label;
-            }
-          }
-        });
-        return feature;
-      }
-
-      function ExportControl() {}
-      ExportControl.prototype = {
-        onAdd: function(map) {
-          this._map = map;
-          this._container = document.createElement('div');
-          this._container.className = 'mapboxgl-ctrl';
-          const button = document.createElement('button');
-          button.textContent = "Get GeoJSON";
-          this._container.appendChild(button);
-          button.addEventListener("click", function() {
-            const json = {
-              "type": "FeatureCollection",
-              "features": map.queryRenderedFeatures().map(enrichment)
-            };
-            const blob = new Blob([JSON.stringify(json, null, 2)], {
-              type: "application/json;charset=utf-8"
-            });
-            saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
+    function ExportControl() {}
+    ExportControl.prototype = {
+      onAdd: function(map) {
+        this._map = map;
+        this._container = document.createElement('div');
+        this._container.className = 'mapboxgl-ctrl';
+        const button = document.createElement('button');
+        button.textContent = "Get GeoJSON";
+        this._container.appendChild(button);
+        button.addEventListener("click", function() {
+          const json = {
+            "type": "FeatureCollection",
+            "features": map.queryRenderedFeatures().map(enrichment)
+          };
+          const blob = new Blob([JSON.stringify(json, null, 2)], {
+            type: "application/json;charset=utf-8"
           });
-          return this._container;
-        },
-        onRemove: function() {
-          this._container.parentNode.removeChild(this._container);
-          this._map = undefined;
+          saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
+        });
+        return this._container;
+      },
+      onRemove: function() {
+        this._container.parentNode.removeChild(this._container);
+        this._map = undefined;
+      }
+    };
+
+
+    const toHTML = function(feature) {
+      const properties = feature.properties;
+      const html = ["<div class='my-popup'>"];
+      Object.keys(properties).forEach(k => {
+        if (k.match(/@$/)) return;
+        if (properties[k + "@"]) {
+          html.push(`<b>${k}</b> `);
+          html.push(`<span>${properties[k+"@"]} (${properties[k]})</span><br/>`);
+        } else {
+          html.push(`<b>${k}</b> `);
+          html.push(`<span>${properties[k]}</span><br/>`);
+        }
+      });
+      html.push("</div>");
+      return html.join("");
+    };
+
+    const map = new maplibregl.Map({
+      "container": "map",
+      "center": [139.68786, 35.68355],
+      "zoom": 14.65,
+      "pitch": 60,
+      "bearing": 22,
+      "hash": true,
+      "style": style
+    });
+
+    map.addControl(new ExportControl());
+
+    map.on("load", function() {
+
+      const handler = function(e) {
+        switch (e.type) {
+          case "mouseenter":
+            map.getCanvas().style.cursor = 'pointer';
+            break;
+          case "mouseleave":
+            map.getCanvas().style.cursor = '';
+            break;
+          case "click":
+            new maplibregl.Popup()
+              .setLngLat(e.lngLat)
+              .setHTML(toHTML(enrichment(e.features[0])))
+              .addTo(map);
+            break;
         }
       };
 
-
-      const toHTML = function(feature) {
-        const properties = feature.properties;
-        const html = ["<div class='my-popup'>"];
-        Object.keys(properties).forEach(k => {
-          if (k.match(/@$/)) return;
-          if (properties[k + "@"]) {
-            html.push(`<b>${k}</b> `);
-            html.push(`<span>${properties[k+"@"]} (${properties[k]})</span><br/>`);
-          } else {
-            html.push(`<b>${k}</b> `);
-            html.push(`<span>${properties[k]}</span><br/>`);
-          }
-        });
-        html.push("</div>");
-        return html.join("");
-      };
-
-      const map = new maplibregl.Map({
-        "container": "map",
-        "center": [139.68786, 35.68355],
-        "zoom": 14.65,
-        "pitch": 60,
-        "bearing": 22,
-        "hash": true,
-        "style": style
-      });
-
-      map.addControl(new ExportControl());
-
-      map.on("load", function() {
-
-        const handler = function(e) {
-          switch (e.type) {
-            case "mouseenter":
-              map.getCanvas().style.cursor = 'pointer';
-              break;
-            case "mouseleave":
-              map.getCanvas().style.cursor = '';
-              break;
-            case "click":
-              new maplibregl.Popup()
-                .setLngLat(e.lngLat)
-                .setHTML(toHTML(enrichment(e.features[0])))
-                .addTo(map);
-              break;
-          }
-        };
-
-        style.layers.filter(a => a["source"] === "npa-rta-2019").forEach(layer => {
-          ["click", "mouseenter", "mouseleave"].forEach(type => {
-            map.on(type, layer.id, handler);
-          });
+      style.layers.filter(a => a["source"] === "npa-rta-2019").forEach(layer => {
+        ["click", "mouseenter", "mouseleave"].forEach(type => {
+          map.on(type, layer.id, handler);
         });
       });
-
-    })();
+    });
   </script>
 </body>
 
