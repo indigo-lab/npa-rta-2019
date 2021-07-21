@@ -72,7 +72,7 @@ npa-rta-2019 | 交通事故情報 (Point) を収納したレイヤー
 元データの値は原則として文字列だが、以下のプロパティは整数値として保持するものとする。
 
 - 「死亡者数」
-- 「障害者数」
+- 「負傷者数」
 
 また、以下のプロパティを追加しています。
 
@@ -93,7 +93,7 @@ npa-rta-2019 | 交通事故情報 (Point) を収納したレイヤー
 
 ## サンプル
 
-以下の MVT としてエンコードされる前の GeoJSON の一例です。
+以下は MVT としてエンコードされる前の GeoJSON の一例です。
 
 ```sample.json
 {
@@ -334,11 +334,11 @@ GeoJSON properties のうち、コード表を参照することでコード値�
 ## コードリスト
 
 コードリストの原本は [コード表](https://www.npa.go.jp/publications/statistics/koutsuu/opendata/2019/opendata_2019.html) として PDF ファイルが提供されています。
-こちらを JSON-LD に加工したものを <./codebook_2019.json> として収録しています。
+こちらを JSON-LD に加工したものを [codebook_2019.json](codebook_2019.json) として収録しています。
 
 ## 属性拡張のための JavaScript 関数
 
-デモページで使用している属性拡張のための JavaScript 関数を <./enrichment.bundle.js> として収録しています。
+デモページで使用している属性拡張のための JavaScript 関数を [enrichment.bundle.js](enrichment.bundle.js) として収録しています。
 
 # 更新履歴
 
