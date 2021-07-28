@@ -6,8 +6,9 @@
   <title>npa-rta-2019</title>
   <meta name="viewport" content="initial-scale=1.0, maximum-scale=1.0" />
   <link rel="stylesheet" href="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.css" />
+  <link rel="stylesheet" href="https://indigo-lab.github.io/mapbox-gl-download/mapbox-gl-download.css" />
   <script src="https://unpkg.com/maplibre-gl@1.14.0/dist/maplibre-gl.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+  <script src="https://indigo-lab.github.io/mapbox-gl-download/mapbox-gl-download.js"></script>
   <script src="enrichment.bundle.js"></script>
   <style>
     .my-popup {
@@ -124,42 +125,6 @@
     };
 
 
-    function ExportControl() {}
-    ExportControl.prototype = {
-      onAdd: function(map) {
-        this._map = map;
-        this._container = document.createElement('div');
-        this._container.className = 'mapboxgl-ctrl';
-        const button = document.createElement('button');
-        button.textContent = "Get GeoJSON";
-        this._container.appendChild(button);
-        button.addEventListener("click", function() {
-          const json = {
-            "type": "FeatureCollection",
-            "features": map.queryRenderedFeatures().map(enrichment).map(a => {
-              const src = a.toJSON();
-              const dst = {};
-              Object.keys(src).forEach(k => {
-                if (["id", "type", "properties", "geometry"].indexOf(k) !== -1)
-                  dst[k] = src[k];
-              });
-              return dst;
-            })
-          };
-          const blob = new Blob([JSON.stringify(json, null, 2)], {
-            type: "application/json;charset=utf-8"
-          });
-          saveAs(blob, `npa-rta-2019_${new Date().getTime()}.json`);
-        });
-        return this._container;
-      },
-      onRemove: function() {
-        this._container.parentNode.removeChild(this._container);
-        this._map = undefined;
-      }
-    };
-
-
     const toHTML = function(feature) {
       const properties = feature.properties;
       const html = ["<div class='my-popup'>"];
@@ -187,7 +152,11 @@
       "style": style
     });
 
-    map.addControl(new ExportControl());
+    map.addControl(new maplibregl.DownloadControl({
+      onEachFeature: function(feature) {
+        return enrichment(feature);
+      }
+    }));
     map.addControl(new maplibregl.FullscreenControl());
     map.addControl(new maplibregl.NavigationControl());
     map.addControl(new maplibregl.ScaleControl());
