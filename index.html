@@ -188,6 +188,9 @@
     });
 
     map.addControl(new ExportControl());
+    map.addControl(new maplibregl.FullscreenControl());
+    map.addControl(new maplibregl.NavigationControl());
+    map.addControl(new maplibregl.ScaleControl());
 
     map.on("load", function() {
 
